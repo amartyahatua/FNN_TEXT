@@ -2,6 +2,24 @@ import torch.nn as nn
 import torch
 import pandas as pd
 
+
+def get_index(df_avg):
+    L = []
+    for val in df_avg.values.tolist():
+        L.extend(val)
+    x = tuple(k[1] for k in sorted((x[1], j) for j, x in enumerate(
+        sorted((x, i) for i, x in enumerate(L)))))
+    ord_index = [max(x) - i+1 for i in list(x)]
+    return ord_index
+
+
+def node_order(weights):
+    average = torch.mean(weights, axis=0)
+    new_average = pd.DataFrame(average.cpu().detach().numpy())
+    ord_index = get_index(new_average)
+    return ord_index
+
+
 class BiLSTM(nn.Module):
 
     def __init__(self, le, opt, embedding_matrix):
@@ -19,23 +37,8 @@ class BiLSTM(nn.Module):
         self.fc = nn.Linear(64, 64)
         self.out = nn.Linear(64, n_classes)
 
-    def get_index(self, df_avg):
-        L = []
-        for val in df_avg.values.tolist():
-            L.extend(val)
-        x = tuple(k[1] for k in sorted((x[1], j) for j, x in enumerate(
-            sorted((x, i) for i, x in enumerate(L)))))
-        ord_index = [max(x) - i+1 for i in list(x)]
-        return ord_index
-
-    def node_order(self, weights):
-        average = torch.mean(weights, axis=0)
-        new_average = pd.DataFrame(average.cpu().detach().numpy())
-        ord_index = self.get_index(new_average)
-        return ord_index
-
     def forward(self, x):
-        # rint(x.size())
+        # print(x.size())
         if self.type == 'learning':
             h_embedding = self.embedding(x)
             # _embedding = torch.squeeze(torch.unsqueeze(h_embedding, 0))
@@ -70,14 +73,14 @@ class BiLSTM(nn.Module):
                 rank = torch.tensor([i for i in range(1, 1+fc_out.shape[1])])
                 rank = rank.cuda()
             elif self.rank==2:
-                rank = self.node_order(fc_out)
+                rank = node_order(fc_out)
                 rank = torch.tensor(rank)
                 rank = rank.cuda()
             elif self.rank==3:
                 rank = torch.tensor([30 for i in range(fc_out.shape[1])])
                 rank = rank.cuda()
             elif self.rank==4:
-                rank = self.node_order(fc_out)
+                rank = node_order(fc_out)
                 rank = [ind+1 if 30 <= ind else 1 for ind in rank]
                 rank = torch.tensor(rank)
                 rank = rank.cuda()
